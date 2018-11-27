@@ -5,21 +5,21 @@
 
 package controllers
 
-import features.{KMClusterManagerFeature, ApplicationFeatures}
-import kafka.manager.model.{CuratorConfig, ClusterTuning, KafkaVersion, ClusterConfig}
+import features.{ApplicationFeatures, KMClusterManagerFeature}
+import kafka.manager.model._
 import kafka.manager.ApiError
 import models.FollowLink
 import models.form._
 import models.navigation.Menus
 import play.api.data.Form
 import play.api.data.Forms._
-import play.api.data.validation.{Valid, Invalid, Constraint}
+import play.api.data.validation.{Constraint, Invalid, Valid}
 import play.api.data.validation.Constraints._
 import play.api.i18n.{I18nSupport, MessagesApi}
 import play.api.mvc._
 
 import scala.concurrent.Future
-import scala.util.{Success, Failure, Try}
+import scala.util.{Failure, Success, Try}
 import scalaz.{-\/, \/-}
 
 /**
@@ -67,6 +67,23 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
     }
   }
 
+  val validateSecurityProtocol: Constraint[String] = Constraint("validate security protocol") { string =>
+    Try {
+      SecurityProtocol(string)
+    } match {
+      case Failure(t) => Invalid(t.getMessage)
+      case Success(_) => Valid
+    }
+  }
+  val validateSASLmechanism: Constraint[Option[String]] = Constraint("validate SASL mechanism") { stringOption =>
+    Try {
+      stringOption.foreach(SASLmechanism.from)
+    } match {
+      case Failure(t) => Invalid(t.getMessage)
+      case Success(_) => Valid
+    }
+  }
+
   val clusterConfigForm = Form(
     mapping(
       "name" -> nonEmptyText.verifying(maxLength(250), validateName)
@@ -86,21 +103,27 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
         mapping(
           "brokerViewUpdatePeriodSeconds" -> optional(number(10, 1000))
           , "clusterManagerThreadPoolSize" -> optional(number(2, 1000))
-          , "clusterManagerThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "clusterManagerThreadPoolQueueSize" -> optional(number(10, 10000))
           , "kafkaCommandThreadPoolSize" -> optional(number(2, 1000))
-          , "kafkaCommandThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "kafkaCommandThreadPoolQueueSize" -> optional(number(10, 10000))
           , "logkafkaCommandThreadPoolSize" -> optional(number(2, 1000))
-          , "logkafkaCommandThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "logkafkaCommandThreadPoolQueueSize" -> optional(number(10, 10000))
           , "logkafkaUpdatePeriodSeconds" -> optional(number(10, 1000))
           , "partitionOffsetCacheTimeoutSecs" -> optional(number(5, 100))
           , "brokerViewThreadPoolSize" -> optional(number(2, 1000))
-          , "brokerViewThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "brokerViewThreadPoolQueueSize" -> optional(number(10, 10000))
           , "offsetCacheThreadPoolSize" -> optional(number(2, 1000))
-          , "offsetCacheThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "offsetCacheThreadPoolQueueSize" -> optional(number(10, 10000))
           , "kafkaAdminClientThreadPoolSize" -> optional(number(2, 1000))
-          , "kafkaAdminClientThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "kafkaAdminClientThreadPoolQueueSize" -> optional(number(10, 10000))
+          , "kafkaManagedOffsetMetadataCheckMillis" -> optional(number(10000, 120000))
+          , "kafkaManagedOffsetGroupCacheSize" -> optional(number(10000, 100000000))
+          , "kafkaManagedOffsetGroupExpireDays" -> optional(number(1, 100))
         )(ClusterTuning.apply)(ClusterTuning.unapply)
       )
+      , "securityProtocol" -> nonEmptyText.verifying(validateSecurityProtocol)
+      , "saslMechanism" -> optional(text).verifying(validateSASLmechanism)
+      , "jaasConfig" -> optional(text)
     )(ClusterConfig.apply)(ClusterConfig.customUnapply)
   )
 
@@ -124,21 +147,27 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
         mapping(
           "brokerViewUpdatePeriodSeconds" -> optional(number(10, 1000))
           , "clusterManagerThreadPoolSize" -> optional(number(2, 1000))
-          , "clusterManagerThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "clusterManagerThreadPoolQueueSize" -> optional(number(10, 10000))
           , "kafkaCommandThreadPoolSize" -> optional(number(2, 1000))
-          , "kafkaCommandThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "kafkaCommandThreadPoolQueueSize" -> optional(number(10, 10000))
           , "logkafkaCommandThreadPoolSize" -> optional(number(2, 1000))
-          , "logkafkaCommandThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "logkafkaCommandThreadPoolQueueSize" -> optional(number(10, 10000))
           , "logkafkaUpdatePeriodSeconds" -> optional(number(10, 1000))
           , "partitionOffsetCacheTimeoutSecs" -> optional(number(5, 100))
           , "brokerViewThreadPoolSize" -> optional(number(2, 1000))
-          , "brokerViewThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "brokerViewThreadPoolQueueSize" -> optional(number(10, 10000))
           , "offsetCacheThreadPoolSize" -> optional(number(2, 1000))
-          , "offsetCacheThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "offsetCacheThreadPoolQueueSize" -> optional(number(10, 10000))
           , "kafkaAdminClientThreadPoolSize" -> optional(number(2, 1000))
-          , "kafkaAdminClientThreadPoolQueueSize" -> optional(number(10, 1000))
+          , "kafkaAdminClientThreadPoolQueueSize" -> optional(number(10, 10000))
+          , "kafkaManagedOffsetMetadataCheckMillis" -> optional(number(10000, 120000))
+          , "kafkaManagedOffsetGroupCacheSize" -> optional(number(10000, 100000000))
+          , "kafkaManagedOffsetGroupExpireDays" -> optional(number(1, 100))
         )(ClusterTuning.apply)(ClusterTuning.unapply)
       )
+      , "securityProtocol" -> nonEmptyText.verifying(validateSecurityProtocol)
+      , "saslMechanism" -> optional(text).verifying(validateSASLmechanism)
+      , "jaasConfig" -> optional(text)
     )(ClusterOperation.apply)(ClusterOperation.customUnapply)
   )
 
@@ -158,6 +187,9 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
       ,false
       ,false
       ,Option(defaultTuning)
+      ,PLAINTEXT
+      ,None
+      ,None
     )
   }
 
@@ -204,7 +236,10 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
             cc.logkafkaEnabled,
             cc.activeOffsetCacheEnabled,
             cc.displaySizeEnabled,
-            cc.tuning
+            cc.tuning,
+            cc.securityProtocol.stringId,
+            cc.saslMechanism.map(_.stringId),
+            cc.jaasConfig
           ))
         }))
       }
@@ -227,6 +262,9 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
             clusterConfig.pollConsumers,
             clusterConfig.filterConsumers,
             clusterConfig.tuning,
+            clusterConfig.securityProtocol.stringId,
+            clusterConfig.saslMechanism.map(_.stringId),
+            clusterConfig.jaasConfig,
             clusterConfig.logkafkaEnabled,
             clusterConfig.activeOffsetCacheEnabled,
             clusterConfig.displaySizeEnabled
@@ -295,6 +333,9 @@ class Cluster (val messagesApi: MessagesApi, val kafkaManagerContext: KafkaManag
               clusterOperation.clusterConfig.pollConsumers,
               clusterOperation.clusterConfig.filterConsumers,
               clusterOperation.clusterConfig.tuning,
+              clusterOperation.clusterConfig.securityProtocol.stringId,
+              clusterOperation.clusterConfig.saslMechanism.map(_.stringId),
+              clusterOperation.clusterConfig.jaasConfig,
               clusterOperation.clusterConfig.logkafkaEnabled,
               clusterOperation.clusterConfig.activeOffsetCacheEnabled,
               clusterOperation.clusterConfig.displaySizeEnabled
