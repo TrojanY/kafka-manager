@@ -5,7 +5,7 @@
 name := """kafka-manager"""
 
 /* For packaging purposes, -SNAPSHOT MUST contain a digit */
-version := "1.3.3.21"
+version := "1.3.3.22"
 
 scalaVersion := "2.11.8"
 
@@ -30,8 +30,8 @@ libraryDependencies ++= Seq(
   "org.webjars" % "dustjs-linkedin" % "2.6.1-1",
   "org.apache.curator" % "curator-framework" % "2.10.0" exclude("log4j","log4j") exclude("org.slf4j", "slf4j-log4j12") force(),
   "org.apache.curator" % "curator-recipes" % "2.10.0" exclude("log4j","log4j") exclude("org.slf4j", "slf4j-log4j12") force(),
-  "org.json4s" %% "json4s-jackson" % "3.4.0",
-  "org.json4s" %% "json4s-scalaz" % "3.4.0",
+  "org.json4s" %% "json4s-jackson" % "3.6.3",
+  "org.json4s" %% "json4s-scalaz" % "3.6.3",
   "org.slf4j" % "log4j-over-slf4j" % "1.7.12",
   "com.adrianhurt" %% "play-bootstrap3" % "0.4.5-P24",
   "org.clapper" %% "grizzled-slf4j" % "1.0.2",
@@ -42,7 +42,8 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.1" % "test",
   "org.apache.curator" % "curator-test" % "2.10.0" % "test",
   "org.mockito" % "mockito-core" % "1.10.19" % "test",
-  "com.yammer.metrics" % "metrics-core" % "2.2.0" force()
+  "com.yammer.metrics" % "metrics-core" % "2.2.0" force(),
+  "com.unboundid" % "unboundid-ldapsdk" % "4.0.9"
 )
 
 routesGenerator := InjectedRoutesGenerator
@@ -66,6 +67,34 @@ enablePlugins(SbtNativePackager)
  */
 
 enablePlugins(SystemdPlugin)
+
+
+enablePlugins(sbtdocker.DockerPlugin)
+dockerfile in docker := {
+  val zipFile: File = dist.value
+
+  new Dockerfile {
+    from("openjdk:8-jre")
+    add(zipFile, file("/opt/kafka-manager.zip"))
+    workDir("/opt")
+    run("unzip", "kafka-manager.zip")
+    run("rm", "-f", "kafka-manager.zip")
+
+    expose(9000)
+
+    cmd(s"kafka-manager-${version.value}/bin/kafka-manager")
+  }
+}
+
+imageNames in docker := Seq(
+  ImageName(
+    s"${name.value}:${version.value}"
+  )
+)
+
+buildOptions in docker := BuildOptions(
+  pullBaseImage = BuildOptions.Pull.Always
+)
 
 /*
  * Start service as user root
